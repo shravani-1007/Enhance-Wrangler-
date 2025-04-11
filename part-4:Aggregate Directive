@@ -1,0 +1,49 @@
+package io.cdap.wrangler.directive;
+
+import io.cdap.wrangler.api.*;
+import io.cdap.wrangler.api.parser.*;
+import java.util.*;
+
+@Directive(type = Directive.Type.AGGREGATE)
+public class AggregateStats implements Directive {
+    private String byteCol;
+    private String timeCol;
+    private String totalByteCol;
+    private String totalTimeCol;
+
+    @Override
+    public UsageDefinition define() {
+        return UsageDefinition.builder()
+            .define("byteCol", TokenType.COLUMN_NAME)
+            .define("timeCol", TokenType.COLUMN_NAME)
+            .define("totalByteCol", TokenType.COLUMN_NAME)
+            .define("totalTimeCol", TokenType.COLUMN_NAME)
+            .build();
+    }
+
+    @Override
+    public void initialize(Arguments args) {
+        byteCol = ((ColumnName) args.value("byteCol")).value();
+        timeCol = ((ColumnName) args.value("timeCol")).value();
+        totalByteCol = ((ColumnName) args.value("totalByteCol")).value();
+        totalTimeCol = ((ColumnName) args.value("totalTimeCol")).value();
+    }
+
+    @Override
+    public List<Row> execute(List<Row> rows, ExecutorContext context) {
+        long totalBytes = 0;
+        long totalMillis = 0;
+
+        for (Row row : rows) {
+            Object b = row.getValue(byteCol);
+            Object t = row.getValue(timeCol);
+            if (b != null) totalBytes += new ByteSize(b.toString()).getBytes();
+            if (t != null) totalMillis += new TimeDuration(t.toString()).getMilliseconds();
+        }
+
+        Row result = new Row();
+        result.add(totalByteCol, totalBytes / (1024.0 * 1024.0)); // MB
+        result.add(totalTimeCol, totalMillis / 1000.0); // sec
+        return Collections.singletonList(result);
+    }
+}
